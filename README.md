@@ -89,19 +89,6 @@ docker-compose down
 docker-compose up --build
 ```
 
-## 📚 Próximos Passos (Ordem Sugerida)
-
-1. **Implementar Database Module** (schema + repository)
-2. **Implementar Kafka publishEvent()**
-3. **Implementar Webhooks processHL7()**
-4. **Conectar tudo no Controller**
-5. **Testar fluxo completo HL7 → Kafka → MongoDB**
-6. **Adicionar endpoints TISS e ERP**
-7. **Criar transformers HL7/TISS → FHIR**
-8. **Adicionar validação com class-validator**
-9. **Adicionar health check**
-10. **Adicionar testes**
-
 ## 🎓 Conceitos Importantes
 
 - **Event-Driven Architecture**: Comunicação assíncrona via Kafka
