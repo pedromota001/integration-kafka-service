@@ -6,6 +6,7 @@ import { KafkaModule } from './kafka/kafka.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { DatabaseModule } from './database/database.module';
 import { TransformersModule } from './transformers/transformers.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TransformersModule } from './transformers/transformers.module';
     WebhooksModule,
     DatabaseModule,
     TransformersModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
