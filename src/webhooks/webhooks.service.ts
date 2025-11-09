@@ -4,6 +4,7 @@ import { KafkaService } from 'src/kafka/kafka.service';
 import { IntegrationLogRepository } from 'src/database/repositories/integration-log.repository';
 import { HL7ToFhirTransformer } from 'src/transformers/hl7-to-fhir.transformer';
 import { KAFKA_TOPICS } from 'src/kafka/kafka-topics.config';
+import { EventType } from 'src/common/interfaces/kafka-event.interface';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -83,9 +84,60 @@ export class WebhooksService {
   }
 
   async processTiss(dto: InboundReceiveDto): Promise<any> {
-    // TODO: Part 2 - Implement TISS processing
-    throw new Error('TISS processing not implemented yet');
+  try {
+    // Create simplified TISS data object
+    const tissData = {
+      rawXml: dto.data,
+      type: 'TISS',
+      receivedAt: new Date().toISOString(),
+    };
+
+    const eventId = uuidv4();
+
+    // Save log to MongoDB
+    const log = await this.integrationLogRepository.create({
+      eventId,
+      type: 'TISS',
+      direction: 'inbound',
+      source: dto.source || 'external-insurance',
+      payload: dto.data,
+      status: 'success',
+      kafkaTopic: KAFKA_TOPICS.INTEGRATION_EVENTS,
+    } as any);
+
+    // Publish event to Kafka
+    await this.kafkaService.publishEvent(
+      KAFKA_TOPICS.INTEGRATION_EVENTS as any,
+      {
+        eventId: log.eventId,
+        eventType: EventType.INBOUND_TISS_RECEIVED,
+        timestamp: new Date().toISOString(),
+        source: 'integration-service',
+        resourceType: 'TISS',
+        data: tissData,
+      },
+    );
+
+    return {
+      success: true,
+      eventId: log.eventId,
+      data: tissData,
+    };
+  } catch (error) {
+    const eventId = uuidv4();
+    await this.integrationLogRepository.create({
+      eventId,
+      type: 'TISS',
+      direction: 'inbound',
+      source: dto.source || 'external-insurance',
+      payload: dto.data,
+      status: 'error',
+      error: error.message,
+      errorStack: error.stack,
+    } as any);
+    throw error;
   }
+}
 
   async processErp(dto: InboundReceiveDto): Promise<any> {
     // TODO: Part 2 - Implement ERP processing
