@@ -140,9 +140,53 @@ export class WebhooksService {
 }
 
   async processErp(dto: InboundReceiveDto): Promise<any> {
-    // TODO: Part 2 - Implement ERP processing
-    throw new Error('ERP processing not implemented yet');
+  try {
+    const erpData = JSON.parse(dto.data);
+
+    const eventId = uuidv4();
+
+    const log = await this.integrationLogRepository.create({
+      eventId,
+      type: 'ERP',
+      direction: 'inbound',
+      source: dto.source || 'external-erp',
+      payload: dto.data,
+      status: 'success',
+      kafkaTopic: KAFKA_TOPICS.INTEGRATION_EVENTS,
+    } as any);
+
+    await this.kafkaService.publishEvent(
+      KAFKA_TOPICS.INTEGRATION_EVENTS as any,
+      {
+        eventId: log.eventId,
+        eventType: EventType.INBOUND_ERP_RECEIVED,
+        timestamp: new Date().toISOString(),
+        source: 'integration-service',
+        resourceType: 'ERP',
+        data: erpData,
+      },
+    );
+
+    return {
+      success: true,
+      eventId: log.eventId,
+      data: erpData,
+    };
+  } catch (error) {
+    const eventId = uuidv4();
+    await this.integrationLogRepository.create({
+      eventId,
+      type: 'ERP',
+      direction: 'inbound',
+      source: dto.source || 'external-erp',
+      payload: dto.data,
+      status: 'error',
+      error: error.message,
+      errorStack: error.stack,
+    } as any);
+    throw error;
   }
+}
 
   private detectIntegrationType(
     dto: InboundReceiveDto,
