@@ -13,7 +13,7 @@ services:
     volumes:
       - ./src:/app/src
     depends_on:
-      kafka
+      kafka:
         condition: service_started
       mongodb:
         condition: service_started

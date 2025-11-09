@@ -5,26 +5,35 @@ const app = express();
 
 app.get('/send', async (req, res) => {
   try {
-    console.log('🧪 Enviando HL7...');
+    console.log('🧪 Enviando HL7 para Integration Service...');
 
-    const hl7Message = `MSH|^~\\&|LAB|ExtLab|||20250126|ORU^R01|MSG001|P|2.5
-PID|1||P001||Silva^João||19900101|M
-OBR|1||ORD001|GLU^Glicose
-OBX|1|NM|GLU||95|mg/dL|70-100|N`;
+    const hl7Message =
+`MSH|^~\\&|LAB|ExtLab|||${Date.now()}||ORU^R01|MSG${Date.now()}|P|2.5
+PID|1||12345||Silva^João||19850315|M
+OBR|1||ORD123||GLU^Glucose^LOINC|||${Date.now()}
+OBX|1|NM|GLU^Glucose^LOINC|1|95|mg/dL|70-100|N|||F|||${Date.now()}`;
 
     const response = await axios.post(
-      'http://integration-service:3010/webhooks/hl7',
-      hl7Message,
-      { headers: { 'Content-Type': 'text/plain' } }
+      'http://integration-service:3010/webhooks/inbound',
+      {
+        data: hl7Message,
+        source: 'mock-lab',
+        contentType: 'HL7',
+      }
     );
 
+    console.log('✅ Sucesso:', response.data);
     res.json({ success: true, response: response.data });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Erro:', error.message);
+    res.status(500).json({
+      error: error.message,
+      details: error.response?.data
+    });
   }
 });
 
 app.listen(4001, '0.0.0.0', () => {
-  console.log('🧪 Mock Lab na porta 4001');
+  console.log('🧪 Mock Lab rodando na porta 4001');
   console.log('   Teste: curl http://localhost:4001/send');
 });
