@@ -31,39 +31,62 @@ export class HL7ToFhirTransformer {
    */
   transform(hl7String: string): FhirObservation {
     try {
-      // Parse da mensagem HL7
-      const message = new hl7.Message(hl7String);
+      // Normalize HL7 message: convert \n to \r (HL7 standard separator)
+      const normalizedHl7 = hl7String.replace(/\n/g, '\r');
 
-      // Validação do tipo de mensagem
-      const msh = message.getSegment('MSH');
-      const messageType = msh.getField(9).toString(); // MSH-9: Message Type
+      // Parse HL7 message manually into segments
+      const segments = normalizedHl7.split('\r');
+      const segmentMap: { [key: string]: string[] } = {};
 
-      if (!messageType.startsWith('ORU^R01')) {
+      for (const segment of segments) {
+        if (!segment) continue;
+        const fields = segment.split('|');
+        const segmentName = fields[0];
+        segmentMap[segmentName] = fields;
+      }
+
+      // Validate MSH segment
+      if (!segmentMap['MSH']) {
+        throw new Error('Segmento MSH (Message Header) não encontrado. Mensagem HL7 inválida.');
+      }
+
+      // MSH format: MSH|^~\&|field1|field2|...|field9
+      // Array indices: [MSH, ^~\&, field1, field2, ..., field8] where field8 is actually MSH-9 (Message Type)
+      // Note: MSH-N is at index N (due to encoding chars taking up index 1)
+      const messageType = segmentMap['MSH'][8]; // MSH-9: Message Type
+
+      if (!messageType || !messageType.startsWith('ORU^R01')) {
         throw new Error(`Tipo de mensagem não suportado: ${messageType}. Apenas ORU^R01 é aceito.`);
       }
 
-      // Extração dos segmentos necessários
-      const pid = message.getSegment('PID'); // Patient Identification
-      const obr = message.getSegment('OBR'); // Observation Request
-      const obx = message.getSegment('OBX'); // Observation Result
+      // Extract required segments
+      const pid = segmentMap['PID']; // Patient Identification
+      const obr = segmentMap['OBR']; // Observation Request
+      const obx = segmentMap['OBX']; // Observation Result
 
       if (!obx) {
         throw new Error('Segmento OBX (Observation Result) não encontrado');
       }
 
+      // Create segment wrapper objects that mimic the hl7.Segment interface
+      const mshSegment = this.createSegmentWrapper(segmentMap['MSH']);
+      const pidSegment = pid ? this.createSegmentWrapper(pid) : undefined;
+      const obrSegment = obr ? this.createSegmentWrapper(obr) : undefined;
+      const obxSegment = this.createSegmentWrapper(obx);
+
       // Construção do recurso FHIR Observation
       const observation: FhirObservation = {
         resourceType: 'Observation',
-        id: this.generateId(obr, obx),
-        status: this.mapStatus(obx),
+        id: this.generateId(obrSegment, obxSegment),
+        status: this.mapStatus(obxSegment),
         category: this.buildCategory(),
-        code: this.buildCode(obx),
-        subject: this.buildSubject(pid),
-        effectiveDateTime: this.extractDateTime(obx),
+        code: this.buildCode(obxSegment),
+        subject: this.buildSubject(pidSegment),
+        effectiveDateTime: this.extractDateTime(obxSegment),
         issued: new Date().toISOString(),
-        valueQuantity: this.buildValue(obx),
-        interpretation: this.buildInterpretation(obx),
-        referenceRange: this.buildReferenceRange(obx),
+        valueQuantity: this.buildValue(obxSegment),
+        interpretation: this.buildInterpretation(obxSegment),
+        referenceRange: this.buildReferenceRange(obxSegment),
       };
 
       return observation;
@@ -242,5 +265,24 @@ export class HL7ToFhirTransformer {
           : undefined,
       },
     ];
+  }
+
+  /**
+   * Helper method to create a segment wrapper that mimics hl7.Segment interface
+   * This wraps a string array from manual HL7 parsing
+   */
+  private createSegmentWrapper(fields: string[]) {
+    return {
+      getField: (index: number) => ({
+        toString: () => fields[index] || '',
+        getComponent: (componentIndex: number) => {
+          const field = fields[index] || '';
+          const components = field.split('^');
+          return {
+            toString: () => components[componentIndex] || '',
+          };
+        },
+      }),
+    };
   }
 }

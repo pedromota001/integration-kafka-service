@@ -47,14 +47,14 @@ export class WebhooksService {
         fhirResource: fhirObservation,
         status: 'success',
         kafkaTopic: KAFKA_TOPICS.INTEGRATION_EVENTS,
-      });
+      } as any);
 
       // 3. Publish event to Kafka
       await this.kafkaService.publishEvent(
-        KAFKA_TOPICS.INTEGRATION_EVENTS,
+        KAFKA_TOPICS.INTEGRATION_EVENTS as any,
         {
           eventId: log.eventId,
-          eventType: 'ExternalDataReceived',
+          eventType: EventType.INBOUND_HL7_RECEIVED,
           timestamp: new Date().toISOString(),
           source: 'integration-service',
           resourceType: 'Observation',
@@ -78,7 +78,7 @@ export class WebhooksService {
         status: 'error',
         error: error.message,
         errorStack: error.stack,
-      });
+      } as any);
       throw error;
     }
   }
